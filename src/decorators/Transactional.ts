@@ -1,11 +1,8 @@
+import type { Knex } from "knex";
 import { TransactionManager } from "../core/transaction-manager";
 
 interface TransactionOptions {
-  isolationLevel?:
-    | "read uncommitted"
-    | "read committed"
-    | "repeatable read"
-    | "serializable";
+  isolationLevel?: Knex.IsolationLevels;
   readOnly?: boolean;
 }
 
@@ -17,10 +14,12 @@ export function Transactional(options: TransactionOptions = {}) {
   ) {
     const originalMethod = descriptor.value;
 
-    descriptor.value = function (...args: any[]) {
+    descriptor.value = async function (...args: any[]) {
+      const isolationLevel = options.isolationLevel;
+
       return TransactionManager.runInTransaction(
         () => originalMethod.apply(this, args),
-        options.isolationLevel
+        isolationLevel
       );
     };
 

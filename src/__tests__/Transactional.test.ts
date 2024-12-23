@@ -14,13 +14,14 @@ describe("Transactional Decorator", () => {
         password: "test1234",
         database: "test_db",
       },
+      debug: true,
       pool: {
         min: 2,
         max: 10,
       },
     });
 
-    initializeTransactions(db);
+    db = initializeTransactions(db);
 
     await db.schema.dropTableIfExists("test_table");
   });
@@ -68,7 +69,7 @@ describe("Transactional Decorator", () => {
     class TestService {
       @Transactional()
       async insertRecord() {
-        await db.into("test_table").insert({ name: "test" });
+        await db.into("test_table").insert({ name: "rollback-test" });
         throw new Error("Test error");
       }
     }
@@ -76,7 +77,9 @@ describe("Transactional Decorator", () => {
     const service = new TestService();
     await expect(service.insertRecord()).rejects.toThrow("Test error");
 
-    const records = await db("test_table").select("*");
+    const records = await db("test_table").select("*").where({
+      name: "rollback-test",
+    });
     expect(records).toHaveLength(0);
   });
 
@@ -86,7 +89,7 @@ describe("Transactional Decorator", () => {
       async insertWithIsolation() {
         const result = await db.raw("SHOW TRANSACTION ISOLATION LEVEL");
         const isolationLevel = result.rows[0].transaction_isolation;
-        expect(isolationLevel).toBe("serializable");
+        expect(isolationLevel.toLowerCase()).toBe("serializable");
 
         await db.into("test_table").insert({ name: "test" });
         return true;
