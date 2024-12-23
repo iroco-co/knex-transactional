@@ -1,16 +1,6 @@
-import { Knex } from "knex";
+import { TransactionManager } from "./core/transaction-manager";
+import type { Knex } from "knex";
 
-let knexInstance: Knex;
-
-export function initializeKnex(knex: Knex) {
-  knexInstance = knex;
-}
-
-export function getKnexInstance(): Knex {
-  if (!knexInstance) {
-    throw new Error(
-      "Knex instance not initialized. Call initializeKnex first."
-    );
-  }
-  return knexInstance;
+export function initializeTransactions(db: Knex) {
+  TransactionManager.initialize(db);
 }
