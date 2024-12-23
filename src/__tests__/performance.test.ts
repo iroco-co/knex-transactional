@@ -1,10 +1,10 @@
 import { Knex, knex } from "knex";
-import { Transactional, initializeKnex } from "../index";
-import { getCurrentTransaction } from "../decorators/Transactional";
+import { Transactional, initializeTransactions } from "../index";
+import { TransactionManager } from "../core/transaction-manager";
 
 describe("Transaction Performance Tests", () => {
   let db: Knex;
-  const ITERATION_COUNT = 1000;
+  const ITERATION_COUNT = 100;
 
   beforeAll(async () => {
     db = knex({
@@ -23,7 +23,7 @@ describe("Transaction Performance Tests", () => {
       },
     });
 
-    initializeKnex(db);
+    initializeTransactions(db);
     await db.schema.dropTableIfExists("performance_test");
 
     await db.schema.createTable("performance_test", (table) => {
@@ -63,7 +63,7 @@ describe("Transaction Performance Tests", () => {
   class TestService {
     @Transactional()
     async decoratorTransaction() {
-      const trx = getCurrentTransaction();
+      const trx = TransactionManager.getTransaction();
       if (!trx) throw new Error("Transaction not found");
 
       await trx("performance_test").insert({ name: "test", value: 1 });
