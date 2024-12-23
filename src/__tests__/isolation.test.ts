@@ -1,6 +1,5 @@
 import { Knex, knex } from "knex";
-import { Transactional, initializeKnex } from "../index";
-import { getCurrentTransaction } from "../decorators/Transactional";
+import { initializeTransactions, Transactional } from "../index";
 
 describe("Transaction Isolation Levels", () => {
   let db: Knex;
@@ -22,7 +21,7 @@ describe("Transaction Isolation Levels", () => {
       },
     });
 
-    initializeKnex(db);
+    initializeTransactions(db);
     await db.schema.dropTableIfExists("isolation_test");
   });
 
@@ -52,10 +51,7 @@ describe("Transaction Isolation Levels", () => {
     class TestService {
       @Transactional({ isolationLevel: "read uncommitted" })
       async transaction1() {
-        const trx = getCurrentTransaction();
-        if (!trx) throw new Error("Transaction not found");
-
-        await trx.into("isolation_test").insert({ name: "test", count: 1 });
+        await db.into("isolation_test").insert({ name: "test", count: 1 });
         // Wait to see if another transaction can read uncommitted data
         await new Promise((resolve) => setTimeout(resolve, 1000));
         throw new Error("Rollback");
@@ -63,10 +59,7 @@ describe("Transaction Isolation Levels", () => {
 
       @Transactional({ isolationLevel: "read uncommitted" })
       async transaction2() {
-        const trx = getCurrentTransaction();
-        if (!trx) throw new Error("Transaction not found");
-
-        const result = await trx("isolation_test").select("*");
+        const result = await db("isolation_test").select("*");
         return result;
       }
     }
@@ -89,20 +82,14 @@ describe("Transaction Isolation Levels", () => {
     class TestService {
       @Transactional({ isolationLevel: "read committed" })
       async transaction1() {
-        const trx = getCurrentTransaction();
-        if (!trx) throw new Error("Transaction not found");
-
-        await trx.into("isolation_test").insert({ name: "test", count: 1 });
+        await db.into("isolation_test").insert({ name: "test", count: 1 });
         await new Promise((resolve) => setTimeout(resolve, 1000));
         throw new Error("Rollback");
       }
 
       @Transactional({ isolationLevel: "read committed" })
       async transaction2() {
-        const trx = getCurrentTransaction();
-        if (!trx) throw new Error("Transaction not found");
-
-        const result = await trx("isolation_test").select("*");
+        const result = await db("isolation_test").select("*");
         return result;
       }
     }
@@ -124,17 +111,14 @@ describe("Transaction Isolation Levels", () => {
     class TestService {
       @Transactional({ isolationLevel: "repeatable read" })
       async longRunningTransaction() {
-        const trx = getCurrentTransaction();
-        if (!trx) throw new Error("Transaction not found");
-
         // First read
-        const result1 = await trx("isolation_test").select("*");
+        const result1 = await db("isolation_test").select("*");
 
         // Give time for another transaction to modify data
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // Second read
-        const result2 = await trx("isolation_test").select("*");
+        const result2 = await db("isolation_test").select("*");
 
         // In Repeatable Read, both results should be identical
         expect(result1).toEqual(result2);
@@ -143,10 +127,7 @@ describe("Transaction Isolation Levels", () => {
 
       @Transactional()
       async modifyData() {
-        const trx = getCurrentTransaction();
-        if (!trx) throw new Error("Transaction not found");
-
-        await trx.into("isolation_test").insert({ name: "test", count: 1 });
+        await db.into("isolation_test").insert({ name: "test", count: 1 });
       }
     }
 
@@ -165,11 +146,8 @@ describe("Transaction Isolation Levels", () => {
     class TestService {
       @Transactional({ isolationLevel: "serializable" })
       async transaction1() {
-        const trx = getCurrentTransaction();
-        if (!trx) throw new Error("Transaction not found");
-
         // Range query
-        const count1 = await trx("isolation_test")
+        const count1 = await db("isolation_test")
           .where("count", ">", 0)
           .count("* as cnt")
           .first();
@@ -177,7 +155,7 @@ describe("Transaction Isolation Levels", () => {
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // Same range query again
-        const count2 = await trx("isolation_test")
+        const count2 = await db("isolation_test")
           .where("count", ">", 0)
           .count("* as cnt")
           .first();
@@ -189,10 +167,7 @@ describe("Transaction Isolation Levels", () => {
 
       @Transactional()
       async insertData() {
-        const trx = getCurrentTransaction();
-        if (!trx) throw new Error("Transaction not found");
-
-        await trx.into("isolation_test").insert({ name: "test", count: 5 });
+        await db.into("isolation_test").insert({ name: "test", count: 5 });
       }
     }
 
