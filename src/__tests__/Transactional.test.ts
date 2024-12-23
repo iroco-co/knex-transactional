@@ -1,7 +1,6 @@
 import { Knex, knex } from "knex";
-import { Transactional, initializeKnex } from "../index";
-import { getCurrentTransaction } from "../decorators/Transactional";
-
+import { Transactional } from "../index";
+import { initializeTransactions } from "../initialize";
 describe("Transactional Decorator", () => {
   let db: Knex;
 
@@ -21,7 +20,7 @@ describe("Transactional Decorator", () => {
       },
     });
 
-    initializeKnex(db);
+    initializeTransactions(db);
 
     await db.schema.dropTableIfExists("test_table");
   });
@@ -52,12 +51,7 @@ describe("Transactional Decorator", () => {
     class TestService {
       @Transactional()
       async insertRecord() {
-        const trx = getCurrentTransaction();
-
-        if (!trx) {
-          throw new Error("Transaction not found");
-        }
-        await trx.into("test_table").insert({ name: "test" });
+        await db.into("test_table").insert({ name: "test" });
         return true;
       }
     }
@@ -74,11 +68,7 @@ describe("Transactional Decorator", () => {
     class TestService {
       @Transactional()
       async insertRecord() {
-        const trx = getCurrentTransaction();
-        if (!trx) {
-          throw new Error("Transaction not found");
-        }
-        await trx.into("test_table").insert({ name: "test" });
+        await db.into("test_table").insert({ name: "test" });
         throw new Error("Test error");
       }
     }
@@ -94,15 +84,11 @@ describe("Transactional Decorator", () => {
     class TestService {
       @Transactional({ isolationLevel: "serializable" })
       async insertWithIsolation() {
-        const trx = getCurrentTransaction();
-        if (!trx) {
-          throw new Error("Transaction not found");
-        }
-        const result = await trx.raw("SHOW TRANSACTION ISOLATION LEVEL");
+        const result = await db.raw("SHOW TRANSACTION ISOLATION LEVEL");
         const isolationLevel = result.rows[0].transaction_isolation;
         expect(isolationLevel).toBe("serializable");
 
-        await trx.into("test_table").insert({ name: "test" });
+        await db.into("test_table").insert({ name: "test" });
         return true;
       }
     }
