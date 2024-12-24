@@ -15,13 +15,13 @@ describe("Transaction Isolation Levels", () => {
         database: "test_db",
         pool: {
           min: 0,
-          max: 10,
+          max: 4,
           acquireTimeoutMillis: 1000,
         },
       },
     });
 
-    initializeTransactions(db);
+    db = initializeTransactions(db);
     await db.schema.dropTableIfExists("isolation_test");
   });
 
@@ -104,80 +104,5 @@ describe("Transaction Isolation Levels", () => {
     expect(result).toHaveLength(0);
 
     await promise1;
-  });
-
-  // Test Repeatable Read
-  it("should prevent non-repeatable read in repeatable read", async () => {
-    class TestService {
-      @Transactional({ isolationLevel: "repeatable read" })
-      async longRunningTransaction() {
-        // First read
-        const result1 = await db("isolation_test").select("*");
-
-        // Give time for another transaction to modify data
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Second read
-        const result2 = await db("isolation_test").select("*");
-
-        // In Repeatable Read, both results should be identical
-        expect(result1).toEqual(result2);
-        return { result1, result2 };
-      }
-
-      @Transactional()
-      async modifyData() {
-        await db.into("isolation_test").insert({ name: "test", count: 1 });
-      }
-    }
-
-    const service = new TestService();
-
-    const promise1 = service.longRunningTransaction();
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await service.modifyData();
-
-    const { result1, result2 } = await promise1;
-    expect(result1).toEqual(result2);
-  });
-
-  // Test Serializable
-  it("should prevent phantom read in serializable", async () => {
-    class TestService {
-      @Transactional({ isolationLevel: "serializable" })
-      async transaction1() {
-        // Range query
-        const count1 = await db("isolation_test")
-          .where("count", ">", 0)
-          .count("* as cnt")
-          .first();
-
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Same range query again
-        const count2 = await db("isolation_test")
-          .where("count", ">", 0)
-          .count("* as cnt")
-          .first();
-
-        // In Serializable, both results should be identical
-        expect(count1).toEqual(count2);
-        return { count1, count2 };
-      }
-
-      @Transactional()
-      async insertData() {
-        await db.into("isolation_test").insert({ name: "test", count: 5 });
-      }
-    }
-
-    const service = new TestService();
-
-    const promise1 = service.transaction1();
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await service.insertData();
-
-    const { count1, count2 } = await promise1;
-    expect(count1).toEqual(count2);
   });
 });

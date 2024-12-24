@@ -1,112 +1,77 @@
 import { AsyncLocalStorage } from "async_hooks";
-import { Knex } from "knex";
 
-interface KnexTransaction extends Knex.Transaction {
-  client: any;
-  config?: {
-    isolationLevel?: Knex.IsolationLevels;
-  };
-}
+import { Knex } from "knex";
 
 export class TransactionManager {
   private static storage = new AsyncLocalStorage<Map<string, any>>();
-  private static db: Knex;
+  private static originalDb: Knex;
+  private static proxiedDb: Knex;
 
-  static initialize(knexInstance: Knex) {
-    this.db = knexInstance;
+  static initialize(knexInstance: Knex): Knex {
+    this.originalDb = knexInstance;
 
-    const proxiedDb = new Proxy(knexInstance, {
+    this.proxiedDb = new Proxy(knexInstance, {
       get: (target: any, prop: string | symbol) => {
-        if (typeof target[prop] === "function" && prop !== "client") {
-          return function (...args: any[]) {
-            const trx = TransactionManager.getTransaction();
-            console.log(`DB Method called: ${String(prop)}`, {
-              hasTransaction: !!trx,
-              args,
-            });
+        if (prop === "__isProxy") {
+          return true;
+        }
 
-            if (trx) {
-              return (trx as any)[prop].apply(trx, args);
+        if (prop === "transaction") {
+          return target[prop].bind(target);
+        }
+
+        const value = target[prop];
+        if (typeof value === "function") {
+          return (...args: any[]) => {
+            const trx = TransactionManager.getTransaction();
+            if (trx && prop !== "transaction") {
+              return (trx as any)[prop](...args);
             }
-            return target[prop].apply(target, args);
+
+            return value.apply(target, args);
           };
         }
 
-        if (prop === "client") {
-          return new Proxy(target.client, {
-            get: (clientTarget: any, clientProp: string | symbol) => {
-              if (clientProp === "query") {
-                return async function (
-                  conn: any,
-                  sql: any,
-                  status: any,
-                  value: any
-                ) {
-                  const trx =
-                    TransactionManager.getTransaction() as KnexTransaction;
-                  console.log("Raw query execution:", {
-                    sql,
-                    hasTransaction: !!trx,
-                    connectionId: conn?.processID,
-                  });
-
-                  if (trx) {
-                    return trx.client
-                      .query(conn, sql, status, value)
-                      .catch((err: any) => {
-                        console.error("Query error:", err);
-                        throw err;
-                      });
-                  }
-                  return clientTarget.query.call(
-                    clientTarget,
-                    conn,
-                    sql,
-                    status,
-                    value
-                  );
-                };
-              }
-              return clientTarget[clientProp];
-            },
-          });
+        return value;
+      },
+      apply: (target: any, thisArg: any, argumentsList: any[]) => {
+        const trx = TransactionManager.getTransaction();
+        if (trx) {
+          return trx(...argumentsList);
         }
-        return target[prop];
+        return target.apply(thisArg, argumentsList);
       },
     });
 
-    this.db = proxiedDb;
-    return proxiedDb;
+    return this.proxiedDb;
   }
 
   static async runInTransaction<T>(
     callback: () => Promise<T>,
-    isolationLevel?: string
+    options: Knex.TransactionConfig
   ): Promise<T> {
+    if (!this.originalDb) {
+      throw new Error("Database not initialized");
+    }
+
     const store = new Map<string, any>();
 
     return this.storage.run(store, async () => {
-      console.log("Starting transaction");
-
-      const normalizedIsolationLevel =
-        isolationLevel?.toLowerCase() as Knex.IsolationLevels;
-
-      const trx = (await this.db.transaction({
-        isolationLevel: normalizedIsolationLevel,
-      })) as KnexTransaction;
+      const trx = await this.originalDb.transaction(options);
 
       store.set("transaction", trx);
-      console.log("Transaction created");
 
       try {
         const result = await callback();
         await trx.commit();
-        console.log("Transaction committed");
         return result;
       } catch (error) {
-        console.error("Transaction error, rolling back:", error);
-        await trx.rollback(error);
+        if (!trx.isCompleted()) {
+          await trx.rollback();
+        }
         throw error;
+      } finally {
+        store.delete("transaction");
       }
     });
   }
@@ -114,9 +79,10 @@ export class TransactionManager {
   static getTransaction(): Knex.Transaction | undefined {
     const store = this.storage.getStore();
     if (!store) {
-      console.log("No active storage");
       return undefined;
     }
-    return store.get("transaction");
+
+    const trx = store.get("transaction");
+    return trx;
   }
 }

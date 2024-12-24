@@ -1,12 +1,7 @@
 import type { Knex } from "knex";
 import { TransactionManager } from "../core/transaction-manager";
 
-interface TransactionOptions {
-  isolationLevel?: Knex.IsolationLevels;
-  readOnly?: boolean;
-}
-
-export function Transactional(options: TransactionOptions = {}) {
+export function Transactional(options: Knex.TransactionConfig = {}) {
   return function (
     target: any,
     propertyKey: string,
@@ -15,11 +10,9 @@ export function Transactional(options: TransactionOptions = {}) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
-      const isolationLevel = options.isolationLevel;
-
       return TransactionManager.runInTransaction(
         () => originalMethod.apply(this, args),
-        isolationLevel
+        options
       );
     };
 

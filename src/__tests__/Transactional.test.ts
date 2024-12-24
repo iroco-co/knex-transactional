@@ -14,10 +14,9 @@ describe("Transactional Decorator", () => {
         password: "test1234",
         database: "test_db",
       },
-      debug: true,
       pool: {
         min: 2,
-        max: 10,
+        max: 4,
       },
     });
 
@@ -52,7 +51,7 @@ describe("Transactional Decorator", () => {
     class TestService {
       @Transactional()
       async insertRecord() {
-        await db.into("test_table").insert({ name: "test" });
+        await db("test_table").insert({ name: "test" });
         return true;
       }
     }
@@ -77,10 +76,31 @@ describe("Transactional Decorator", () => {
     const service = new TestService();
     await expect(service.insertRecord()).rejects.toThrow("Test error");
 
-    const records = await db("test_table").select("*").where({
-      name: "rollback-test",
-    });
+    const records = await db("test_table").select("*").where({});
     expect(records).toHaveLength(0);
+  });
+
+  it("should persist data without transaction decorator", async () => {
+    class TestService {
+      async insertAndFail() {
+        await db("test_table").insert({
+          name: "no-transaction-test",
+        });
+
+        throw new Error("Test error");
+      }
+    }
+
+    const service = new TestService();
+
+    await expect(service.insertAndFail()).rejects.toThrow("Test error");
+
+    const records = await db("test_table")
+      .where({ name: "no-transaction-test" })
+      .select("*");
+
+    expect(records).toHaveLength(1);
+    expect(records[0].name).toBe("no-transaction-test");
   });
 
   it("should respect transaction isolation level", async () => {
@@ -91,12 +111,23 @@ describe("Transactional Decorator", () => {
         const isolationLevel = result.rows[0].transaction_isolation;
         expect(isolationLevel.toLowerCase()).toBe("serializable");
 
-        await db.into("test_table").insert({ name: "test" });
+        await db("test_table").insert({ name: "test" });
         return true;
       }
     }
 
     const service = new TestService();
     await service.insertWithIsolation();
+  });
+
+  describe("Proxy Detection Test", () => {
+    it("should detect if db is a Proxy", () => {
+      const dbProxy = db as any;
+      expect(dbProxy.__isProxy).toBe(true);
+    });
+
+    it("should detect if db is not a Proxy", () => {
+      expect((knex as any).__isProxy).toBe(undefined);
+    });
   });
 });
