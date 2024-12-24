@@ -1,0 +1,23 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 5
+      arrivalRate: 10
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 100
+      name: "Peak load"
+  plugins:
+    metrics-by-endpoint: {}
+
+scenarios:
+  - name: "Compare Transaction Methods"
+    flow:
+      - post:
+          url: "/decorator-transaction"
+          json:
+            name: "test-decorator"
+      - post:
+          url: "/manual-transaction"
+          json:
+            name: "test-manual"
