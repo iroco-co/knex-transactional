@@ -1,6 +1,6 @@
 {
   "name": "knex-transactional",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "Knex Transactional Decorator",
   "main": "dist/index.js",
   "types": "dist/types/index.d.ts",
@@ -30,7 +30,15 @@
     "async_hooks"
   ],
   "author": "ms.jung.dev",
-  "license": "ISC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/knex-transactional/knex-transactional.git"
+  },
+  "homepage": "https://github.com/knex-transactional/knex-transactional",
+  "bugs": {
+    "url": "https://github.com/knex-transactional/knex-transactional/issues"
+  },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.2",
     "@rollup/plugin-node-resolve": "^16.0.0",
