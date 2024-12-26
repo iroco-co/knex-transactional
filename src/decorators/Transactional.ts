@@ -2,7 +2,11 @@ import type { Knex } from "knex";
 import { TransactionManager } from "../core/transaction-manager";
 
 export function Transactional(options: Knex.TransactionConfig = {}) {
-  return function (descriptor: PropertyDescriptor) {
+  return function (
+    _target: any,
+    _propertyKey: string,
+    descriptor: PropertyDescriptor
+  ) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
