@@ -1,0 +1,9 @@
+src/
+tests/
+examples/
+.github/
+.gitignore
+.prettierrc
+jest.config.js
+tsconfig.json
+rollup.config.js 

@@ -9,8 +9,25 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
-    "typeRoots": ["./node_modules/@types", "./src/types"]
+    "declarationDir": "./dist/types",
+    "sourceMap": true,
+    "declarationMap": true,
+    "removeComments": false,
+    "importHelpers": true,
+    "moduleResolution": "node",
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "pretty": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/__tests__/*",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }

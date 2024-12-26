@@ -71,7 +71,6 @@ app.post("/manual-transaction", async (req, res) => {
   }
 });
 
-// 테이블 초기화
 async function initializeTable() {
   try {
     await db.schema.dropTableIfExists("test_table");
@@ -87,14 +86,12 @@ async function initializeTable() {
   }
 }
 
-// 서버 시작
 const PORT = 3000;
 app.listen(PORT, async () => {
   await initializeTable();
   console.log(`Server is running on port ${PORT}`);
 });
 
-// 종료 시 정리
 process.on("SIGTERM", async () => {
   await db.destroy();
   process.exit(0);
