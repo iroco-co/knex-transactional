@@ -4,7 +4,7 @@ services:
   postgres_test:
     image: postgres:14
     ports:
-      - "5433:5432" # 호스트의 5433포트를 컨테이너의 5432포트와 매핑
+      - "5433:5432"
     environment:
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test1234
